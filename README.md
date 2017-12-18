@@ -20,6 +20,4 @@ git submodule update
 Add dependencies to .\Modules\ as git submodule
 
 # Build
-How to package???
-  * Zip should contain all the required modules
-  * PSDepends?
+During build check out everything from git and zip it up (submodule commits need to be online
