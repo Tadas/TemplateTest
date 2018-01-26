@@ -1,4 +1,8 @@
-﻿task InstallDependencies {
+﻿$ArtifactPath = "$BuildRoot\Artifacts"
+
+task . InstallDependencies, Analyze, Test, Clean, Archive
+
+task InstallDependencies {
 	Install-Module Pester -Scope CurrentUser 
 	Install-Module PSScriptAnalyzer -Scope CurrentUser
 }
@@ -33,4 +37,22 @@ task Test {
 
 	$numberFails = $testResults.FailedCount
 	assert($numberFails -eq 0) ('Failed "{0}" unit tests.' -f $numberFails)
+}
+
+task Clean {
+	$Artifacts = $ArtifactPath
+	
+	if (Test-Path -Path $Artifacts) {
+		Remove-Item "$ArtifactPath/*" -Recurse -Force
+	}
+
+	New-Item -ItemType Directory -Path $Artifacts -Force
+}
+
+task Archive {
+	$Artifacts = $ArtifactPath
+	$ModuleName = ($BuildRoot -split '\\')[-1]
+	Compress-Archive  -LiteralPath ".\Begin.ps1" -DestinationPath "$Artifacts\$ModuleName.zip"
+	# Compress-Archive -Path .\DSCClassResources -Update -DestinationPath "$Artifacts\$ModuleName.zip"
+	# Compress-Archive -Path .\Examples -Update -DestinationPath "$Artifacts\$ModuleName.zip"
 }
