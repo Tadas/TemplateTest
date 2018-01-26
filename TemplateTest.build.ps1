@@ -53,6 +53,6 @@ task Archive {
 	$Artifacts = $ArtifactPath
 	$ModuleName = ($BuildRoot -split '\\')[-1]
 	Compress-Archive  -LiteralPath ".\Begin.ps1" -DestinationPath "$Artifacts\$ModuleName.zip"
-	# Compress-Archive -Path .\DSCClassResources -Update -DestinationPath "$Artifacts\$ModuleName.zip"
+	Compress-Archive -Path .\Modules -Update -DestinationPath "$Artifacts\$ModuleName.zip"
 	# Compress-Archive -Path .\Examples -Update -DestinationPath "$Artifacts\$ModuleName.zip"
 }
