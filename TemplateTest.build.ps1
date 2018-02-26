@@ -3,7 +3,7 @@ $ArtifactPath = "$BuildRoot\Artifacts"
 task . InstallDependencies, Analyze, Test, Clean, Build
 
 task InstallDependencies {
-	Install-Module Pester -Scope CurrentUser 
+	Install-Module Pester -Scope CurrentUser
 	Install-Module PSScriptAnalyzer -Scope CurrentUser
 }
 
@@ -13,7 +13,7 @@ task Analyze {
 		Severity = @('Error', 'Warning')
 		Recurse = $true
 		Verbose = $false
-		# ExcludeRule = 'PSUseDeclaredVarsMoreThanAssignments'
+		ExcludeRule = 'PSAvoidUsingWriteHost'
 	}
 	
 	$Results = Invoke-ScriptAnalyzer @scriptAnalyzerParams
@@ -43,7 +43,7 @@ task Clean {
 	if (Test-Path -Path $ArtifactPath) {
 		Remove-Item "$ArtifactPath/*" -Recurse -Force
 	}
-	New-Item -ItemType Directory -Path $ArtifactPath -Force
+	New-Item -ItemType Directory -Path $ArtifactPath -Force | Out-Null
 }
 
 task Build {
@@ -57,7 +57,7 @@ task Build {
 				$TempPath,
 				$_.FullName.Substring($BuildRoot.Length + 1)
 			)
-			Write-Host "Moving $($_.FullName)`r`n`t to $DestinationPath`r`n"
+			Write-Host "`tMoving $($_.FullName)`r`n`t`t to $DestinationPath`r`n"
 
 			# Makes sure the path is available
 			New-Item -ItemType File -Path $DestinationPath -Force | Out-Null
