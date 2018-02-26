@@ -1,6 +1,6 @@
-﻿$ArtifactPath = "$BuildRoot\Artifacts"
+$ArtifactPath = "$BuildRoot\Artifacts"
 
-task . InstallDependencies, Analyze, Test, Clean, Archive
+task . InstallDependencies, Analyze, Test, Clean, Build
 
 task InstallDependencies {
 	Install-Module Pester -Scope CurrentUser 
@@ -40,19 +40,46 @@ task Test {
 }
 
 task Clean {
-	$Artifacts = $ArtifactPath
-	
-	if (Test-Path -Path $Artifacts) {
+	if (Test-Path -Path $ArtifactPath) {
 		Remove-Item "$ArtifactPath/*" -Recurse -Force
 	}
-
-	New-Item -ItemType Directory -Path $Artifacts -Force
+	New-Item -ItemType Directory -Path $ArtifactPath -Force
 }
 
-task Archive {
-	$Artifacts = $ArtifactPath
-	$ModuleName = ($BuildRoot -split '\\')[-1]
-	Compress-Archive  -LiteralPath ".\Begin.ps1" -DestinationPath "$Artifacts\$ModuleName.zip"
-	Compress-Archive -Path .\Modules -Update -DestinationPath "$Artifacts\$ModuleName.zip"
-	# Compress-Archive -Path .\Examples -Update -DestinationPath "$Artifacts\$ModuleName.zip"
+task Build {
+	try {
+		$TempPath = New-TemporaryFolder
+		$ModuleName = ($BuildRoot -split '\\')[-1]
+
+		Get-ChildItem -File -Recurse $BuildRoot -Exclude ".git*" | ForEach-Object {
+			
+			$DestinationPath = [System.IO.Path]::Combine(
+				$TempPath,
+				$_.FullName.Substring($BuildRoot.Length + 1)
+			)
+			Write-Host "Moving $($_.FullName)`r`n`t to $DestinationPath`r`n"
+
+			# Makes sure the path is available
+			New-Item -ItemType File -Path $DestinationPath -Force | Out-Null
+			Copy-Item -LiteralPath $_.FullName -Destination $DestinationPath -Force
+		}
+		Compress-Archive -Path "$TempPath\*" -DestinationPath "$ArtifactPath\$ModuleName.zip" -Verbose -Force
+	
+	} finally {
+		if(Test-Path -PathType Container -LiteralPath $TempPath) { Remove-Item -Recurse $TempPath -Force }
+	}
+}
+
+task PushRelease {
+}
+
+function New-TemporaryFolder {
+	do {
+		$TemporaryPath = [System.IO.Path]::Combine(
+			[System.IO.Path]::GetTempPath(),
+			[System.IO.Path]::GetFileNameWithoutExtension([System.IO.Path]::GetRandomFileName())
+		)
+
+	} while (Test-Path -PathType Container -LiteralPath $TemporaryPath)
+	New-Item -ItemType Container -Path $TemporaryPath
 }
