@@ -1,4 +1,9 @@
-$ArtifactPath = "$BuildRoot\Artifacts"
+﻿Import-Module $BuildRoot\BuildTools -Force
+
+$ProjectName      = ($BuildRoot -split '\\')[-1]
+$ArtifactPath     = "$BuildRoot\Artifacts"
+$ArtifactFileName = "$ProjectName.zip"
+$ArtifactFullPath = "$ArtifactPath\$ProjectName.zip"
 
 task . InstallDependencies, Analyze, Test, Clean, Build
 
@@ -49,10 +54,14 @@ task Clean {
 task Build {
 	try {
 		$TempPath = New-TemporaryFolder
-		$ModuleName = ($BuildRoot -split '\\')[-1]
 
-		Get-ChildItem -File -Recurse $BuildRoot -Exclude ".git*" | ForEach-Object {
-			
+		Get-ChildItem -File -Recurse $BuildRoot | Where-Object {
+			(-not $_.FullName.Contains("\.vscode\")) -and
+			(-not $_.FullName.Contains("\.git")) -and
+			(-not $_.FullName.Contains("\Artifacts\")) -and
+			(-not $_.FullName.Contains("\Tests\"))
+
+		} | ForEach-Object {
 			$DestinationPath = [System.IO.Path]::Combine(
 				$TempPath,
 				$_.FullName.Substring($BuildRoot.Length + 1)
@@ -63,14 +72,56 @@ task Build {
 			New-Item -ItemType File -Path $DestinationPath -Force | Out-Null
 			Copy-Item -LiteralPath $_.FullName -Destination $DestinationPath -Force
 		}
-		Compress-Archive -Path "$TempPath\*" -DestinationPath "$ArtifactPath\$ModuleName.zip" -Verbose -Force
-	
+		Compress-Archive -Path "$TempPath\*" -DestinationPath "$ArtifactPath\$ProjectName.zip" -Verbose -Force
+
 	} finally {
 		if(Test-Path -PathType Container -LiteralPath $TempPath) { Remove-Item -Recurse $TempPath -Force }
 	}
 }
 
-task PushRelease {
+task CreateReleaseAndUpload {
+	$versionNumber = "0.2" # Get-NextVersionNumber
+	$releaseNotes = "How to create release notes?"
+	$gitHubApiKey = "47ccba14444c88d19b7dbcd75a210a4404e0282f"
+
+
+	$releaseData = @{
+		tag_name = $versionNumber
+		target_commitish = git rev-parse HEAD;
+		name = [string]::Format("{0}", $versionNumber);
+		body = $releaseNotes;
+		draft = $true;
+		prerelease = $false;
+	}
+
+	$releaseParams = @{
+		Uri = "https://api.github.com/repos/Tadas/$ProjectName/releases";
+		Method = 'POST';
+		Headers = @{
+			Authorization = 'Basic {0}' -f ([System.Convert]::ToBase64String([char[]]"Tadas:$gitHubApiKey"))
+		};
+		ContentType = 'application/json';
+		Body = (ConvertTo-Json $releaseData -Compress)
+	}
+
+	[Net.ServicePointManager]::SecurityProtocol = "tls12, tls11, tls"
+	$result = Invoke-RestMethod @releaseParams
+
+	Write-Host "Upload url →" $result.upload_url
+	$uploadUri = $result.upload_url -replace '\{\?name,label\}', "?name=$ArtifactFileName"
+	Write-Host $uploadUri
+
+	$uploadParams = @{
+		Uri = $uploadUri;
+		Method = 'POST';
+		Headers = @{
+			Authorization = 'Basic {0}' -f ([System.Convert]::ToBase64String([char[]]"Tadas:$gitHubApiKey"))
+		};
+		ContentType = 'application/zip';
+		InFile = $ArtifactFullPath
+	}
+
+	$result = Invoke-RestMethod @uploadParams
 }
 
 function New-TemporaryFolder {
